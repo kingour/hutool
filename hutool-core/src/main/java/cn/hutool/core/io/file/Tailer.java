@@ -1,5 +1,14 @@
 package cn.hutool.core.io.file;
 
+import cn.hutool.core.date.DateUnit;
+import cn.hutool.core.exceptions.UtilException;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.io.IORuntimeException;
+import cn.hutool.core.io.LineHandler;
+import cn.hutool.core.lang.Console;
+import cn.hutool.core.util.CharUtil;
+import cn.hutool.core.util.CharsetUtil;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -12,18 +21,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import cn.hutool.core.date.DateUnit;
-import cn.hutool.core.exceptions.UtilException;
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.io.IORuntimeException;
-import cn.hutool.core.io.LineHandler;
-import cn.hutool.core.lang.Console;
-import cn.hutool.core.util.CharUtil;
-import cn.hutool.core.util.CharsetUtil;
-
 /**
  * 文件内容跟随器，实现类似Linux下"tail -f"命令功能
- * 
+ *
  * @author looly
  * @since 4.5.2
  */
@@ -33,20 +33,20 @@ public class Tailer implements Serializable {
 	public static final LineHandler CONSOLE_HANDLER = new ConsoleLineHandler();
 
 	/** 编码 */
-	private Charset charset;
+	private final Charset charset;
 	/** 行处理器 */
-	private LineHandler lineHandler;
+	private final LineHandler lineHandler;
 	/** 初始读取的行数 */
-	private int initReadLine;
+	private final int initReadLine;
 	/** 定时任务检查间隔时长 */
-	private long period;
+	private final long period;
 
-	private RandomAccessFile randomAccessFile;
-	private ScheduledExecutorService executorService;
+	private final RandomAccessFile randomAccessFile;
+	private final ScheduledExecutorService executorService;
 
 	/**
 	 * 构造，默认UTF-8编码
-	 * 
+	 *
 	 * @param file 文件
 	 * @param lineHandler 行处理器
 	 */
@@ -56,7 +56,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 构造，默认UTF-8编码
-	 * 
+	 *
 	 * @param file 文件
 	 * @param lineHandler 行处理器
 	 * @param initReadLine 启动时预读取的行数
@@ -67,7 +67,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param file 文件
 	 * @param charset 编码
 	 * @param lineHandler 行处理器
@@ -78,7 +78,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 构造
-	 * 
+	 *
 	 * @param file 文件
 	 * @param charset 编码
 	 * @param lineHandler 行处理器
@@ -104,7 +104,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 开始监听
-	 * 
+	 *
 	 * @param async 是否异步执行
 	 */
 	public void start(boolean async) {
@@ -133,11 +133,18 @@ public class Tailer implements Serializable {
 		}
 	}
 
+	/**
+	 * 结束，此方法需在异步模式或
+	 */
+	public void stop(){
+		this.executorService.shutdown();
+	}
+
 	// ---------------------------------------------------------------------------------------- Private method start
 	/**
 	 * 预读取行
-	 * 
-	 * @throws IOException
+	 *
+	 * @throws IOException IO异常
 	 */
 	private void readTail() throws IOException {
 		final long len = this.randomAccessFile.length();
@@ -195,7 +202,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 检查文件有效性
-	 * 
+	 *
 	 * @param file 文件
 	 */
 	private static void checkFile(File file) {
@@ -210,7 +217,7 @@ public class Tailer implements Serializable {
 
 	/**
 	 * 命令行打印的行处理器
-	 * 
+	 *
 	 * @author looly
 	 * @since 4.5.2
 	 */
@@ -220,4 +227,5 @@ public class Tailer implements Serializable {
 			Console.log(line);
 		}
 	}
+
 }

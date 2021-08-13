@@ -1,21 +1,20 @@
 package cn.hutool.core.io;
 
+import cn.hutool.core.io.file.LineSeparator;
+import cn.hutool.core.lang.Console;
+import cn.hutool.core.util.CharsetUtil;
+import org.junit.Assert;
+import org.junit.Ignore;
+import org.junit.Test;
+
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
-
-import cn.hutool.core.io.file.LineSeparator;
-import cn.hutool.core.lang.Console;
-import cn.hutool.core.util.CharsetUtil;
-
 /**
  * {@link FileUtil} 单元测试类
- * 
+ *
  * @author Looly
  */
 public class FileUtilTest {
@@ -27,10 +26,10 @@ public class FileUtilTest {
 
 		// 构建目录中出现非子目录抛出异常
 		FileUtil.file(file, "../ccc");
-		
+
 		FileUtil.file("E:/");
 	}
-	
+
 	@Test
 	public void getAbsolutePathTest() {
 		String absolutePath = FileUtil.getAbsolutePath("LICENSE-junit.txt");
@@ -38,12 +37,12 @@ public class FileUtilTest {
 		String absolutePath2 = FileUtil.getAbsolutePath(absolutePath);
 		Assert.assertNotNull(absolutePath2);
 		Assert.assertEquals(absolutePath, absolutePath2);
-	}
 
-	@Test
-	public void getAbsolutePathTest2() {
 		String path = FileUtil.getAbsolutePath("中文.xml");
 		Assert.assertTrue(path.contains("中文.xml"));
+
+		path = FileUtil.getAbsolutePath("d:");
+		Assert.assertEquals("d:", path);
 	}
 
 	@Test
@@ -59,7 +58,7 @@ public class FileUtilTest {
 		boolean result = FileUtil.del("e:/Hutool_test_3434543533409843.txt");
 		Assert.assertTrue(result);
 	}
-	
+
 	@Test
 	@Ignore
 	public void delTest2() {
@@ -71,7 +70,13 @@ public class FileUtilTest {
 	@Test
 	@Ignore
 	public void renameTest() {
-		FileUtil.rename(FileUtil.file("hutool.jpg"), "b.png", false, false);
+		FileUtil.rename(FileUtil.file("d:/test/3.jpg"), "2.jpg", false);
+	}
+
+	@Test
+	@Ignore
+	public void renameTest2() {
+		FileUtil.move(FileUtil.file("d:/test/a"), FileUtil.file("d:/test/b"), false);
 	}
 
 	@Test
@@ -87,7 +92,7 @@ public class FileUtilTest {
 
 	@Test
 	@Ignore
-	public void copyFilesFromDir() {
+	public void copyFilesFromDirTest() {
 		File srcFile = FileUtil.file("D:\\驱动");
 		File destFile = FileUtil.file("d:\\驱动备份");
 
@@ -95,7 +100,25 @@ public class FileUtilTest {
 	}
 
 	@Test
-	public void equlasTest() {
+	@Ignore
+	public void copyDirTest() {
+		File srcFile = FileUtil.file("D:\\test");
+		File destFile = FileUtil.file("E:\\");
+
+		FileUtil.copy(srcFile, destFile, true);
+	}
+
+	@Test
+	@Ignore
+	public void moveDirTest() {
+		File srcFile = FileUtil.file("E:\\test2");
+		File destFile = FileUtil.file("D:\\");
+
+		FileUtil.move(srcFile, destFile, true);
+	}
+
+	@Test
+	public void equalsTest() {
 		// 源文件和目标文件都不存在
 		File srcFile = FileUtil.file("d:/hutool.jpg");
 		File destFile = FileUtil.file("d:/hutool.jpg");
@@ -126,16 +149,22 @@ public class FileUtilTest {
 		Assert.assertEquals("/baz", FileUtil.normalize("/foo/../bar/../baz"));
 		Assert.assertEquals("/", FileUtil.normalize("/../"));
 		Assert.assertEquals("foo", FileUtil.normalize("foo/bar/.."));
-		Assert.assertEquals("bar", FileUtil.normalize("foo/../../bar"));
+		Assert.assertEquals("../bar", FileUtil.normalize("foo/../../bar"));
 		Assert.assertEquals("bar", FileUtil.normalize("foo/../bar"));
 		Assert.assertEquals("/server/bar", FileUtil.normalize("//server/foo/../bar"));
 		Assert.assertEquals("/bar", FileUtil.normalize("//server/../bar"));
 		Assert.assertEquals("C:/bar", FileUtil.normalize("C:\\foo\\..\\bar"));
+		//
 		Assert.assertEquals("C:/bar", FileUtil.normalize("C:\\..\\bar"));
-		Assert.assertEquals("bar", FileUtil.normalize("../../bar"));
+		Assert.assertEquals("../../bar", FileUtil.normalize("../../bar"));
 		Assert.assertEquals("C:/bar", FileUtil.normalize("/C:/bar"));
-
+		Assert.assertEquals("C:", FileUtil.normalize("C:"));
 		Assert.assertEquals("\\/192.168.1.1/Share/", FileUtil.normalize("\\\\192.168.1.1\\Share\\"));
+	}
+
+	@Test
+	public void normalizeBlankTest() {
+		Assert.assertEquals("C:/aaa ", FileUtil.normalize("C:\\aaa "));
 	}
 
 	@Test
@@ -145,8 +174,21 @@ public class FileUtilTest {
 	}
 
 	@Test
+	public void normalizeHomePathTest2() {
+		String home = FileUtil.getUserHomePath().replace('\\', '/');
+		// 多个~应该只替换开头的
+		Assert.assertEquals(home + "/~bar/", FileUtil.normalize("~/foo/../~bar/"));
+	}
+
+	@Test
 	public void normalizeClassPathTest() {
 		Assert.assertEquals("", FileUtil.normalize("classpath:"));
+	}
+
+	@Test
+	public void normalizeClassPathTest2() {
+		Assert.assertEquals("../a/b.csv", FileUtil.normalize("../a/b.csv"));
+		Assert.assertEquals("../../../a/b.csv", FileUtil.normalize("../../../a/b.csv"));
 	}
 
 	@Test
@@ -228,7 +270,16 @@ public class FileUtilTest {
 		names = FileUtil.listFileNames(".");
 		Assert.assertTrue(names.contains("hutool.jpg"));
 	}
-	
+
+	@Test
+	@Ignore
+	public void listFileNamesInJarTest() {
+		List<String> names = FileUtil.listFileNames("d:/test/hutool-core-5.1.0.jar!/cn/hutool/core/util ");
+		for (String name : names) {
+			Console.log(name);
+		}
+	}
+
 	@Test
 	@Ignore
 	public void listFileNamesTest2() {
@@ -246,7 +297,7 @@ public class FileUtilTest {
 			Console.log(file.getPath());
 		}
 	}
-	
+
 	@Test
 	@Ignore
 	public void loopFilesWithDepthTest() {
@@ -285,7 +336,7 @@ public class FileUtilTest {
 		String dir = "d:\\aaa\\bbb\\cc\\ddd";
 		int index = FileUtil.lastIndexOfSeparator(dir);
 		Assert.assertEquals(13, index);
-		
+
 		String file = "ddd.jpg";
 		int index2 = FileUtil.lastIndexOfSeparator(file);
 		Assert.assertEquals(-1, index2);
@@ -319,17 +370,21 @@ public class FileUtilTest {
 
 	@Test
 	public void extNameTest() {
-		String path = "d:\\aaa\\bbb\\cc\\ddd\\";
+		String path =  FileUtil.isWindows() ? "d:\\aaa\\bbb\\cc\\ddd\\" : "~/Desktop/hutool/ddd/";
 		String mainName = FileUtil.extName(path);
 		Assert.assertEquals("", mainName);
 
-		path = "d:\\aaa\\bbb\\cc\\ddd";
+		path =  FileUtil.isWindows() ? "d:\\aaa\\bbb\\cc\\ddd" : "~/Desktop/hutool/ddd";
 		mainName = FileUtil.extName(path);
 		Assert.assertEquals("", mainName);
 
-		path = "d:\\aaa\\bbb\\cc\\ddd.jpg";
+		path = FileUtil.isWindows() ? "d:\\aaa\\bbb\\cc\\ddd.jpg" : "~/Desktop/hutool/ddd.jpg";
 		mainName = FileUtil.extName(path);
 		Assert.assertEquals("jpg", mainName);
+
+		path = FileUtil.isWindows() ? "d:\\aaa\\bbb\\cc\\fff.xlsx" : "~/Desktop/hutool/fff.xlsx";
+		mainName = FileUtil.extName(path);
+		Assert.assertEquals("xlsx", mainName);
 	}
 
 	@Test
@@ -338,10 +393,33 @@ public class FileUtilTest {
 		Assert.assertNotNull(webRoot);
 		Assert.assertEquals("hutool-core", webRoot.getName());
 	}
-	
+
 	@Test
 	public void getMimeTypeTest() {
 		String mimeType = FileUtil.getMimeType("test2Write.jpg");
 		Assert.assertEquals("image/jpeg", mimeType);
+
+		mimeType = FileUtil.getMimeType("test2Write.html");
+		Assert.assertEquals("text/html", mimeType);
+
+		mimeType = FileUtil.getMimeType("main.css");
+		Assert.assertEquals("text/css", mimeType);
+
+		mimeType = FileUtil.getMimeType("test.js");
+		Assert.assertEquals("application/x-javascript", mimeType);
+	}
+
+	@Test
+	public void isSubTest() {
+		File file = new File("d:/test");
+		File file2 = new File("d:/test2/aaa");
+		Assert.assertFalse(FileUtil.isSub(file, file2));
+	}
+
+	@Test
+	public void isSubRelativeTest() {
+		File file = new File("..");
+		File file2 = new File(".");
+		Assert.assertTrue(FileUtil.isSub(file, file2));
 	}
 }

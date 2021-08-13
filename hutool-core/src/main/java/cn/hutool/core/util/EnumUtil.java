@@ -1,13 +1,13 @@
 package cn.hutool.core.util;
 
+import cn.hutool.core.lang.Assert;
+import cn.hutool.core.map.MapUtil;
+
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import cn.hutool.core.lang.Assert;
-import cn.hutool.core.map.MapUtil;
 
 /**
  * 枚举工具类
@@ -48,6 +48,20 @@ public class EnumUtil {
 	 */
 	public static String toString(Enum<?> e) {
 		return null != e ? e.name() : null;
+	}
+
+	/**
+	 * 字符串转枚举，调用{@link Enum#valueOf(Class, String)}
+	 *
+	 * @param <E>       枚举类型泛型
+	 * @param enumClass 枚举类
+	 * @param index     枚举索引
+	 * @return 枚举值，null表示无此对应枚举
+	 * @since 5.1.6
+	 */
+	public static <E extends Enum<E>> E getEnumAt(Class<E> enumClass, int index) {
+		final E[] enumConstants = enumClass.getEnumConstants();
+		return index >= 0 && index < enumConstants.length ? enumConstants[index] : null;
 	}
 
 	/**
@@ -206,7 +220,7 @@ public class EnumUtil {
 	 * @since 4.0.2
 	 */
 	public static <E extends Enum<E>> LinkedHashMap<String, E> getEnumMap(final Class<E> enumClass) {
-		final LinkedHashMap<String, E> map = new LinkedHashMap<String, E>();
+		final LinkedHashMap<String, E> map = new LinkedHashMap<>();
 		for (final E e : enumClass.getEnumConstants()) {
 			map.put(e.name(), e);
 		}
@@ -226,7 +240,7 @@ public class EnumUtil {
 		if (null == enums) {
 			return null;
 		}
-		final Map<String, Object> map = MapUtil.newHashMap(enums.length);
+		final Map<String, Object> map = MapUtil.newHashMap(enums.length, true);
 		for (Enum<?> e : enums) {
 			map.put(e.name(), ReflectUtil.getFieldValue(e, fieldName));
 		}
@@ -248,7 +262,7 @@ public class EnumUtil {
 	/**
 	 * 判断某个值是不存在枚举中
 	 *
-	 * @param <E> 枚举类型
+	 * @param <E>       枚举类型
 	 * @param enumClass 枚举类
 	 * @param val       需要查找的值
 	 * @return 是否不存在

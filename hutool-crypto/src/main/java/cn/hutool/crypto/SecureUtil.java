@@ -1,5 +1,30 @@
 package cn.hutool.crypto;
 
+import cn.hutool.core.codec.Base64;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.lang.Validator;
+import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.HexUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.asymmetric.AsymmetricAlgorithm;
+import cn.hutool.crypto.asymmetric.RSA;
+import cn.hutool.crypto.asymmetric.Sign;
+import cn.hutool.crypto.asymmetric.SignAlgorithm;
+import cn.hutool.crypto.digest.DigestAlgorithm;
+import cn.hutool.crypto.digest.Digester;
+import cn.hutool.crypto.digest.HMac;
+import cn.hutool.crypto.digest.HmacAlgorithm;
+import cn.hutool.crypto.digest.MD5;
+import cn.hutool.crypto.symmetric.AES;
+import cn.hutool.crypto.symmetric.DES;
+import cn.hutool.crypto.symmetric.DESede;
+import cn.hutool.crypto.symmetric.PBKDF2;
+import cn.hutool.crypto.symmetric.RC4;
+import cn.hutool.crypto.symmetric.SymmetricCrypto;
+
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
 import java.io.File;
 import java.io.InputStream;
 import java.security.KeyPair;
@@ -16,32 +41,6 @@ import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.KeySpec;
 import java.util.Map;
 
-import javax.crypto.Cipher;
-import javax.crypto.Mac;
-import javax.crypto.SecretKey;
-
-import cn.hutool.core.codec.Base64;
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.lang.Validator;
-import cn.hutool.core.map.MapUtil;
-import cn.hutool.core.util.HexUtil;
-import cn.hutool.core.util.IdUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.crypto.asymmetric.AsymmetricAlgorithm;
-import cn.hutool.crypto.asymmetric.RSA;
-import cn.hutool.crypto.asymmetric.Sign;
-import cn.hutool.crypto.asymmetric.SignAlgorithm;
-import cn.hutool.crypto.digest.DigestAlgorithm;
-import cn.hutool.crypto.digest.Digester;
-import cn.hutool.crypto.digest.HMac;
-import cn.hutool.crypto.digest.HmacAlgorithm;
-import cn.hutool.crypto.digest.MD5;
-import cn.hutool.crypto.symmetric.AES;
-import cn.hutool.crypto.symmetric.DES;
-import cn.hutool.crypto.symmetric.DESede;
-import cn.hutool.crypto.symmetric.RC4;
-import cn.hutool.crypto.symmetric.SymmetricCrypto;
-
 /**
  * 安全相关工具类<br>
  * 加密分为三种：<br>
@@ -49,9 +48,9 @@ import cn.hutool.crypto.symmetric.SymmetricCrypto;
  * 2、非对称加密（asymmetric），例如：RSA、DSA等<br>
  * 3、摘要加密（digest），例如：MD5、SHA-1、SHA-256、HMAC等<br>
  *
- * @author xiaoleilu, Gsealy
+ * @author Looly, Gsealy
  */
-public final class SecureUtil {
+public class SecureUtil {
 
 	/**
 	 * 默认密钥字节数
@@ -627,7 +626,7 @@ public final class SecureUtil {
 	 * 创建HMac对象，调用digest方法可获得hmac值
 	 *
 	 * @param algorithm {@link HmacAlgorithm}
-	 * @param key       密钥，如果为<code>null</code>生成随机密钥
+	 * @param key       密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.3.0
 	 */
@@ -639,7 +638,7 @@ public final class SecureUtil {
 	 * 创建HMac对象，调用digest方法可获得hmac值
 	 *
 	 * @param algorithm {@link HmacAlgorithm}
-	 * @param key       密钥，如果为<code>null</code>生成随机密钥
+	 * @param key       密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.0.3
 	 */
@@ -651,7 +650,7 @@ public final class SecureUtil {
 	 * 创建HMac对象，调用digest方法可获得hmac值
 	 *
 	 * @param algorithm {@link HmacAlgorithm}
-	 * @param key       密钥{@link SecretKey}，如果为<code>null</code>生成随机密钥
+	 * @param key       密钥{@link SecretKey}，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.0.3
 	 */
@@ -665,7 +664,7 @@ public final class SecureUtil {
 	 * HmacMD5加密：hmacMd5(key).digest(data)<br>
 	 * HmacMD5加密并转为16进制字符串：hmacMd5(key).digestHex(data)<br>
 	 *
-	 * @param key 加密密钥，如果为<code>null</code>生成随机密钥
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.3.0
 	 */
@@ -679,7 +678,7 @@ public final class SecureUtil {
 	 * HmacMD5加密：hmacMd5(key).digest(data)<br>
 	 * HmacMD5加密并转为16进制字符串：hmacMd5(key).digestHex(data)<br>
 	 *
-	 * @param key 加密密钥，如果为<code>null</code>生成随机密钥
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 */
 	public static HMac hmacMd5(byte[] key) {
@@ -704,7 +703,7 @@ public final class SecureUtil {
 	 * HmacSHA1加密：hmacSha1(key).digest(data)<br>
 	 * HmacSHA1加密并转为16进制字符串：hmacSha1(key).digestHex(data)<br>
 	 *
-	 * @param key 加密密钥，如果为<code>null</code>生成随机密钥
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 * @since 3.3.0
 	 */
@@ -718,7 +717,7 @@ public final class SecureUtil {
 	 * HmacSHA1加密：hmacSha1(key).digest(data)<br>
 	 * HmacSHA1加密并转为16进制字符串：hmacSha1(key).digestHex(data)<br>
 	 *
-	 * @param key 加密密钥，如果为<code>null</code>生成随机密钥
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
 	 * @return {@link HMac}
 	 */
 	public static HMac hmacSha1(byte[] key) {
@@ -735,6 +734,47 @@ public final class SecureUtil {
 	 */
 	public static HMac hmacSha1() {
 		return new HMac(HmacAlgorithm.HmacSHA1);
+	}
+
+	/**
+	 * HmacSHA256加密器<br>
+	 * 例：<br>
+	 * HmacSHA256加密：hmacSha256(key).digest(data)<br>
+	 * HmacSHA256加密并转为16进制字符串：hmacSha256(key).digestHex(data)<br>
+	 *
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
+	 * @return {@link HMac}
+	 * @since 5.6.0
+	 */
+	public static HMac hmacSha256(String key) {
+		return hmacSha256(StrUtil.utf8Bytes(key));
+	}
+
+	/**
+	 * HmacSHA256加密器<br>
+	 * 例：<br>
+	 * HmacSHA256加密：hmacSha256(key).digest(data)<br>
+	 * HmacSHA256加密并转为16进制字符串：hmacSha256(key).digestHex(data)<br>
+	 *
+	 * @param key 加密密钥，如果为{@code null}生成随机密钥
+	 * @return {@link HMac}
+	 * @since 5.6.0
+	 */
+	public static HMac hmacSha256(byte[] key) {
+		return new HMac(HmacAlgorithm.HmacSHA256, key);
+	}
+
+	/**
+	 * HmacSHA256加密器，生成随机KEY<br>
+	 * 例：<br>
+	 * HmacSHA256加密：hmacSha256().digest(data)<br>
+	 * HmacSHA256加密并转为16进制字符串：hmacSha256().digestHex(data)<br>
+	 *
+	 * @return {@link HMac}
+	 * @since 5.6.0
+	 */
+	public static HMac hmacSha256() {
+		return new HMac(HmacAlgorithm.HmacSHA256);
 	}
 
 	// ------------------------------------------------------------------- 非称加密算法
@@ -825,13 +865,14 @@ public final class SecureUtil {
 	 * 参数签名为对Map参数按照key的顺序排序后拼接为字符串，然后根据提供的签名算法生成签名字符串<br>
 	 * 拼接后的字符串键值对之间无符号，键值对之间无符号，忽略null值
 	 *
-	 * @param crypto 对称加密算法
-	 * @param params 参数
+	 * @param crypto      对称加密算法
+	 * @param params      参数
+	 * @param otherParams 其它附加参数字符串（例如密钥）
 	 * @return 签名
 	 * @since 4.0.1
 	 */
-	public static String signParams(SymmetricCrypto crypto, Map<?, ?> params) {
-		return signParams(crypto, params, StrUtil.EMPTY, StrUtil.EMPTY, true);
+	public static String signParams(SymmetricCrypto crypto, Map<?, ?> params, String... otherParams) {
+		return signParams(crypto, params, StrUtil.EMPTY, StrUtil.EMPTY, true, otherParams);
 	}
 
 	/**
@@ -843,15 +884,13 @@ public final class SecureUtil {
 	 * @param separator         entry之间的连接符
 	 * @param keyValueSeparator kv之间的连接符
 	 * @param isIgnoreNull      是否忽略null的键和值
+	 * @param otherParams       其它附加参数字符串（例如密钥）
 	 * @return 签名
 	 * @since 4.0.1
 	 */
-	public static String signParams(SymmetricCrypto crypto, Map<?, ?> params, String separator, String keyValueSeparator, boolean isIgnoreNull) {
-		if (MapUtil.isEmpty(params)) {
-			return null;
-		}
-		String paramsStr = MapUtil.join(MapUtil.sort(params), separator, keyValueSeparator, isIgnoreNull);
-		return crypto.encryptHex(paramsStr);
+	public static String signParams(SymmetricCrypto crypto, Map<?, ?> params, String separator,
+	                                String keyValueSeparator, boolean isIgnoreNull, String... otherParams) {
+		return crypto.encryptHex(MapUtil.sortJoin(params, separator, keyValueSeparator, isIgnoreNull, otherParams));
 	}
 
 	/**
@@ -859,12 +898,13 @@ public final class SecureUtil {
 	 * 参数签名为对Map参数按照key的顺序排序后拼接为字符串，然后根据提供的签名算法生成签名字符串<br>
 	 * 拼接后的字符串键值对之间无符号，键值对之间无符号，忽略null值
 	 *
-	 * @param params 参数
+	 * @param params      参数
+	 * @param otherParams 其它附加参数字符串（例如密钥）
 	 * @return 签名
 	 * @since 4.0.1
 	 */
-	public static String signParamsMd5(Map<?, ?> params) {
-		return signParams(DigestAlgorithm.MD5, params);
+	public static String signParamsMd5(Map<?, ?> params, String... otherParams) {
+		return signParams(DigestAlgorithm.MD5, params, otherParams);
 	}
 
 	/**
@@ -872,12 +912,13 @@ public final class SecureUtil {
 	 * 参数签名为对Map参数按照key的顺序排序后拼接为字符串，然后根据提供的签名算法生成签名字符串<br>
 	 * 拼接后的字符串键值对之间无符号，键值对之间无符号，忽略null值
 	 *
-	 * @param params 参数
+	 * @param params      参数
+	 * @param otherParams 其它附加参数字符串（例如密钥）
 	 * @return 签名
 	 * @since 4.0.8
 	 */
-	public static String signParamsSha1(Map<?, ?> params) {
-		return signParams(DigestAlgorithm.SHA1, params);
+	public static String signParamsSha1(Map<?, ?> params, String... otherParams) {
+		return signParams(DigestAlgorithm.SHA1, params, otherParams);
 	}
 
 	/**
@@ -885,12 +926,13 @@ public final class SecureUtil {
 	 * 参数签名为对Map参数按照key的顺序排序后拼接为字符串，然后根据提供的签名算法生成签名字符串<br>
 	 * 拼接后的字符串键值对之间无符号，键值对之间无符号，忽略null值
 	 *
-	 * @param params 参数
+	 * @param params      参数
+	 * @param otherParams 其它附加参数字符串（例如密钥）
 	 * @return 签名
 	 * @since 4.0.1
 	 */
-	public static String signParamsSha256(Map<?, ?> params) {
-		return signParams(DigestAlgorithm.SHA256, params);
+	public static String signParamsSha256(Map<?, ?> params, String... otherParams) {
+		return signParams(DigestAlgorithm.SHA256, params, otherParams);
 	}
 
 	/**
@@ -900,11 +942,12 @@ public final class SecureUtil {
 	 *
 	 * @param digestAlgorithm 摘要算法
 	 * @param params          参数
+	 * @param otherParams     其它附加参数字符串（例如密钥）
 	 * @return 签名
 	 * @since 4.0.1
 	 */
-	public static String signParams(DigestAlgorithm digestAlgorithm, Map<?, ?> params) {
-		return signParams(digestAlgorithm, params, StrUtil.EMPTY, StrUtil.EMPTY, true);
+	public static String signParams(DigestAlgorithm digestAlgorithm, Map<?, ?> params, String... otherParams) {
+		return signParams(digestAlgorithm, params, StrUtil.EMPTY, StrUtil.EMPTY, true, otherParams);
 	}
 
 	/**
@@ -916,28 +959,13 @@ public final class SecureUtil {
 	 * @param separator         entry之间的连接符
 	 * @param keyValueSeparator kv之间的连接符
 	 * @param isIgnoreNull      是否忽略null的键和值
+	 * @param otherParams       其它附加参数字符串（例如密钥）
 	 * @return 签名
 	 * @since 4.0.1
 	 */
-	public static String signParams(DigestAlgorithm digestAlgorithm, Map<?, ?> params, String separator, String keyValueSeparator, boolean isIgnoreNull) {
-		if (MapUtil.isEmpty(params)) {
-			return null;
-		}
-		final String paramsStr = MapUtil.join(MapUtil.sort(params), separator, keyValueSeparator, isIgnoreNull);
-		return new Digester(digestAlgorithm).digestHex(paramsStr);
-	}
-
-	// ------------------------------------------------------------------- UUID
-
-	/**
-	 * 简化的UUID，去掉了横线
-	 *
-	 * @return 简化的UUID，去掉了横线
-	 * @deprecated 请使用 {@link IdUtil#simpleUUID()}
-	 */
-	@Deprecated
-	public static String simpleUUID() {
-		return IdUtil.simpleUUID();
+	public static String signParams(DigestAlgorithm digestAlgorithm, Map<?, ?> params, String separator,
+	                                String keyValueSeparator, boolean isIgnoreNull, String... otherParams) {
+		return new Digester(digestAlgorithm).digestHex(MapUtil.sortJoin(params, separator, keyValueSeparator, isIgnoreNull, otherParams));
 	}
 
 	/**
@@ -1031,6 +1059,26 @@ public final class SecureUtil {
 	}
 
 	/**
+	 * 创建{@link Signature}
+	 *
+	 * @param algorithm 算法
+	 * @return {@link Signature}
+	 * @since 5.7.0
+	 */
+	public static Signature createSignature(String algorithm) {
+		final Provider provider = GlobalBouncyCastleProvider.INSTANCE.getProvider();
+
+		Signature signature;
+		try {
+			signature = (null == provider) ? Signature.getInstance(algorithm) : Signature.getInstance(algorithm, provider);
+		} catch (NoSuchAlgorithmException e) {
+			throw new CryptoException(e);
+		}
+
+		return signature;
+	}
+
+	/**
 	 * RC4算法
 	 *
 	 * @param key 密钥
@@ -1047,5 +1095,17 @@ public final class SecureUtil {
 	 */
 	public static void disableBouncyCastle() {
 		GlobalBouncyCastleProvider.setUseBouncyCastle(false);
+	}
+
+	/**
+	 * PBKDF2加密密码
+	 *
+	 * @param password 密码
+	 * @param salt 盐
+	 * @return 盐，一般为16位
+	 * @since 5.6.0
+	 */
+	public static String pbkdf2(char[] password, byte[] salt){
+		return new PBKDF2().encryptHex(password, salt);
 	}
 }

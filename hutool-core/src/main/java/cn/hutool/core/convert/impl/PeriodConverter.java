@@ -4,12 +4,11 @@ import cn.hutool.core.convert.AbstractConverter;
 
 import java.time.Period;
 import java.time.temporal.TemporalAmount;
-import java.util.Optional;
 
 /**
- * 
+ *
  * {@link Period}对象转换器
- * 
+ *
  * @author Looly
  * @since 5.0.0
  */

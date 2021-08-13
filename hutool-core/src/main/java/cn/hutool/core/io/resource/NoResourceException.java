@@ -6,7 +6,7 @@ import cn.hutool.core.util.StrUtil;
 
 /**
  * 资源文件或资源不存在异常
- * 
+ *
  * @author xiaoleilu
  * @since 4.0.2
  */
@@ -35,15 +35,13 @@ public class NoResourceException extends IORuntimeException {
 
 	/**
 	 * 导致这个异常的异常是否是指定类型的异常
-	 * 
+	 *
 	 * @param clazz 异常类
 	 * @return 是否为指定类型异常
 	 */
+	@Override
 	public boolean causeInstanceOf(Class<? extends Throwable> clazz) {
-		Throwable cause = this.getCause();
-		if (clazz.isInstance(cause)) {
-			return true;
-		}
-		return false;
+		final Throwable cause = this.getCause();
+		return clazz.isInstance(cause);
 	}
 }

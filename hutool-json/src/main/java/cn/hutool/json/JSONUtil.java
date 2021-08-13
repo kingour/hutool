@@ -1,19 +1,5 @@
 package cn.hutool.json;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.StringWriter;
-import java.io.Writer;
-import java.lang.reflect.Type;
-import java.nio.charset.Charset;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Map;
-import java.util.ResourceBundle;
-
 import cn.hutool.core.io.IORuntimeException;
 import cn.hutool.core.io.file.FileReader;
 import cn.hutool.core.lang.TypeReference;
@@ -29,12 +15,26 @@ import cn.hutool.json.serialize.JSONDeserializer;
 import cn.hutool.json.serialize.JSONObjectSerializer;
 import cn.hutool.json.serialize.JSONSerializer;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.lang.reflect.Type;
+import java.nio.charset.Charset;
+import java.sql.SQLException;
+import java.time.temporal.TemporalAccessor;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 /**
  * JSON工具类
  *
  * @author Looly
  */
-public final class JSONUtil {
+public class JSONUtil {
 
 	// -------------------------------------------------------------------- Pause start
 
@@ -48,12 +48,34 @@ public final class JSONUtil {
 	}
 
 	/**
+	 * 创建JSONObject
+	 *
+	 * @param config JSON配置
+	 * @return JSONObject
+	 * @since 5.2.5
+	 */
+	public static JSONObject createObj(JSONConfig config) {
+		return new JSONObject(config);
+	}
+
+	/**
 	 * 创建 JSONArray
 	 *
 	 * @return JSONArray
 	 */
 	public static JSONArray createArray() {
 		return new JSONArray();
+	}
+
+	/**
+	 * 创建 JSONArray
+	 *
+	 * @param config JSON配置
+	 * @return JSONArray
+	 * @since 5.2.5
+	 */
+	public static JSONArray createArray(JSONConfig config) {
+		return new JSONArray(config);
 	}
 
 	/**
@@ -75,6 +97,19 @@ public final class JSONUtil {
 	 */
 	public static JSONObject parseObj(Object obj) {
 		return new JSONObject(obj);
+	}
+
+	/**
+	 * JSON字符串转JSONObject对象<br>
+	 * 此方法会忽略空值，但是对JSON字符串不影响
+	 *
+	 * @param obj    Bean对象或者Map
+	 * @param config JSON配置
+	 * @return JSONObject
+	 * @since 5.3.1
+	 */
+	public static JSONObject parseObj(Object obj, JSONConfig config) {
+		return new JSONObject(obj, config);
 	}
 
 	/**
@@ -127,6 +162,18 @@ public final class JSONUtil {
 	 * JSON字符串转JSONArray
 	 *
 	 * @param arrayOrCollection 数组或集合对象
+	 * @param config            JSON配置
+	 * @return JSONArray
+	 * @since 5.3.1
+	 */
+	public static JSONArray parseArray(Object arrayOrCollection, JSONConfig config) {
+		return new JSONArray(arrayOrCollection, config);
+	}
+
+	/**
+	 * JSON字符串转JSONArray
+	 *
+	 * @param arrayOrCollection 数组或集合对象
 	 * @param ignoreNullValue   是否忽略空值
 	 * @return JSONArray
 	 * @since 3.2.3
@@ -146,6 +193,30 @@ public final class JSONUtil {
 	 * @return JSON
 	 */
 	public static JSON parse(Object obj) {
+		if(obj instanceof JSON){
+			return (JSON) obj;
+		}
+
+		final JSONConfig config = JSONConfig.create();
+		if(InternalJSONUtil.isOrder(obj)){
+			config.setOrder(true);
+		}
+		return parse(obj, config);
+	}
+
+	/**
+	 * 转换对象为JSON<br>
+	 * 支持的对象：<br>
+	 * String: 转换为相应的对象<br>
+	 * Array、Iterable、Iterator：转换为JSONArray<br>
+	 * Bean对象：转为JSONObject
+	 *
+	 * @param obj    对象
+	 * @param config JSON配置
+	 * @return JSON
+	 * @since 5.3.1
+	 */
+	public static JSON parse(Object obj, JSONConfig config) {
 		if (null == obj) {
 			return null;
 		}
@@ -153,17 +224,13 @@ public final class JSONUtil {
 		JSON json;
 		if (obj instanceof JSON) {
 			json = (JSON) obj;
-		} else if (obj instanceof String) {
-			String jsonStr = ((String) obj).trim();
-			if (jsonStr.startsWith("[")) {
-				json = parseArray(jsonStr);
-			} else {
-				json = parseObj(jsonStr);
-			}
-		} else if (obj instanceof Collection || obj.getClass().isArray()) {// 列表
-			json = new JSONArray(obj);
+		} else if (obj instanceof CharSequence) {
+			final String jsonStr = StrUtil.trim((CharSequence) obj);
+			json = isJsonArray(jsonStr) ? parseArray(jsonStr, config) : parseObj(jsonStr, config);
+		} else if (obj instanceof Iterable || obj instanceof Iterator || ArrayUtil.isArray(obj)) {// 列表
+			json = new JSONArray(obj, config);
 		} else {// 对象
-			json = new JSONObject(obj);
+			json = new JSONObject(obj, config);
 		}
 
 		return json;
@@ -179,33 +246,6 @@ public final class JSONUtil {
 		return XML.toJSONObject(xmlStr);
 	}
 
-	/**
-	 * Map转化为JSONObject
-	 *
-	 * @param map {@link Map}
-	 * @return JSONObject
-	 */
-	public static JSONObject parseFromMap(Map<?, ?> map) {
-		return new JSONObject(map);
-	}
-
-	/**
-	 * ResourceBundle转化为JSONObject
-	 *
-	 * @param bundle ResourceBundle文件
-	 * @return JSONObject
-	 */
-	public static JSONObject parseFromResourceBundle(ResourceBundle bundle) {
-		JSONObject jsonObject = new JSONObject();
-		Enumeration<String> keys = bundle.getKeys();
-		while (keys.hasMoreElements()) {
-			String key = keys.nextElement();
-			if (key != null) {
-				InternalJSONUtil.propertyPut(jsonObject, key, bundle.getString(key));
-			}
-		}
-		return jsonObject;
-	}
 	// -------------------------------------------------------------------- Pause end
 
 	// -------------------------------------------------------------------- Read start
@@ -277,6 +317,19 @@ public final class JSONUtil {
 	}
 
 	/**
+	 * 转为JSON字符串，并写出到write
+	 *
+	 * @param json JSON
+	 * @param writer Writer
+	 * @since 5.3.3
+	 */
+	public static void toJsonStr(JSON json, Writer writer) {
+		if (null != json) {
+			json.write(writer);
+		}
+	}
+
+	/**
 	 * 转为JSON字符串
 	 *
 	 * @param json JSON
@@ -299,10 +352,23 @@ public final class JSONUtil {
 		if (null == obj) {
 			return null;
 		}
-		if (obj instanceof String) {
-			return (String) obj;
+		if (obj instanceof CharSequence) {
+			return StrUtil.str((CharSequence) obj);
 		}
 		return toJsonStr(parse(obj));
+	}
+
+	/**
+	 * 转换为JSON字符串并写出到writer
+	 *
+	 * @param obj 被转为JSON的对象
+	 * @param writer Writer
+	 * @since 5.3.3
+	 */
+	public static void toJsonStr(Object obj, Writer writer) {
+		if (null != obj) {
+			toJsonStr(parse(obj), writer);
+		}
 	}
 
 	/**
@@ -414,10 +480,23 @@ public final class JSONUtil {
 	// -------------------------------------------------------------------- toBean end
 
 	/**
+	 * 将JSONArray字符串转换为Bean的List，默认为ArrayList
+	 *
+	 * @param <T>         Bean类型
+	 * @param jsonArray   JSONArray字符串
+	 * @param elementType List中元素类型
+	 * @return List
+	 * @since 5.5.2
+	 */
+	public static <T> List<T> toList(String jsonArray, Class<T> elementType) {
+		return toList(parseArray(jsonArray), elementType);
+	}
+
+	/**
 	 * 将JSONArray转换为Bean的List，默认为ArrayList
 	 *
 	 * @param <T>         Bean类型
-	 * @param jsonArray   JSONArray
+	 * @param jsonArray   {@link JSONArray}
 	 * @param elementType List中元素类型
 	 * @return List
 	 * @since 4.0.7
@@ -448,7 +527,44 @@ public final class JSONUtil {
 	 * @see JSON#getByPath(String)
 	 */
 	public static Object getByPath(JSON json, String expression) {
-		return (null == json || StrUtil.isBlank(expression)) ? null : json.getByPath(expression);
+		return getByPath(json, expression, null);
+	}
+
+	/**
+	 * 通过表达式获取JSON中嵌套的对象<br>
+	 * <ol>
+	 * <li>.表达式，可以获取Bean对象中的属性（字段）值或者Map中key对应的值</li>
+	 * <li>[]表达式，可以获取集合等对象中对应index的值</li>
+	 * </ol>
+	 * <p>
+	 * 表达式栗子：
+	 *
+	 * <pre>
+	 * persion
+	 * persion.name
+	 * persons[3]
+	 * person.friends[5].name
+	 * </pre>
+	 *
+	 * @param <T> 值类型
+	 * @param json       {@link JSON}
+	 * @param expression 表达式
+	 * @param defaultValue 默认值
+	 * @return 对象
+	 * @see JSON#getByPath(String)
+	 * @since 5.6.0
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> T getByPath(JSON json, String expression, T defaultValue) {
+		if((null == json || StrUtil.isBlank(expression))){
+			return defaultValue;
+		}
+
+		if(null != defaultValue){
+			final Class<T> type = (Class<T>) defaultValue.getClass();
+			return ObjectUtil.defaultIfNull(json.getByPath(expression, type), defaultValue);
+		}
+		return (T) json.getByPath(expression);
 	}
 
 	/**
@@ -543,25 +659,17 @@ public final class JSONUtil {
 			return writer;
 		}
 
-		char b; // 前一个字符
-		char c = 0; // 当前字符
+		char c; // 当前字符
 		int len = str.length();
 		if (isWrap) {
 			writer.write('"');
 		}
 		for (int i = 0; i < len; i++) {
-			b = c;
 			c = str.charAt(i);
 			switch (c) {
 				case '\\':
 				case '"':
 					writer.write("\\");
-					writer.write(c);
-					break;
-				case '/':
-					if (b == '<') {
-						writer.write('\\');
-					}
 					writer.write(c);
 					break;
 				default:
@@ -599,12 +707,12 @@ public final class JSONUtil {
 	 * 在需要的时候包装对象<br>
 	 * 包装包括：
 	 * <ul>
-	 * <li><code>null</code> =》 <code>JSONNull.NULL</code></li>
+	 * <li>{@code null} =》 {@code JSONNull.NULL}</li>
 	 * <li>array or collection =》 JSONArray</li>
 	 * <li>map =》 JSONObject</li>
 	 * <li>standard property (Double, String, et al) =》 原对象</li>
 	 * <li>来自于java包 =》 字符串</li>
-	 * <li>其它 =》 尝试包装为JSONObject，否则返回<code>null</code></li>
+	 * <li>其它 =》 尝试包装为JSONObject，否则返回{@code null}</li>
 	 * </ul>
 	 *
 	 * @param object     被包装的对象
@@ -640,6 +748,11 @@ public final class JSONUtil {
 		}
 
 		try {
+			// fix issue#1399@Github
+			if(object instanceof SQLException){
+				return object.toString();
+			}
+
 			// JSONArray
 			if (object instanceof Iterable || ArrayUtil.isArray(object)) {
 				return new JSONArray(object, jsonConfig);
@@ -650,7 +763,10 @@ public final class JSONUtil {
 			}
 
 			// 日期类型原样保存，便于格式化
-			if (object instanceof Date || object instanceof Calendar) {
+			if (object instanceof Date
+					|| object instanceof Calendar
+					|| object instanceof TemporalAccessor
+			) {
 				return object;
 			}
 			// 枚举类保存其字符串形式（4.0.2新增）
@@ -678,7 +794,7 @@ public final class JSONUtil {
 	 * @since 3.1.2
 	 */
 	public static String formatJsonStr(String jsonStr) {
-		return JSONStrFormater.format(jsonStr);
+		return JSONStrFormatter.format(jsonStr);
 	}
 
 	/**
@@ -703,7 +819,7 @@ public final class JSONUtil {
 		if (StrUtil.isBlank(str)) {
 			return false;
 		}
-		return StrUtil.isWrap(str.trim(), '{', '}');
+		return StrUtil.isWrap(StrUtil.trim(str), '{', '}');
 	}
 
 	/**
@@ -717,7 +833,7 @@ public final class JSONUtil {
 		if (StrUtil.isBlank(str)) {
 			return false;
 		}
-		return StrUtil.isWrap(str.trim(), '[', ']');
+		return StrUtil.isWrap(StrUtil.trim(str), '[', ']');
 	}
 
 	/**

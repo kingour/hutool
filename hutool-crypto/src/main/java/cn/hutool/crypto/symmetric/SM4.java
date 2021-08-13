@@ -10,7 +10,15 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 
 /**
- * SM4实现
+ * 国密对称堆成加密算法SM4实现
+ *
+ * <p>
+ * 国密算法包括：
+ * <ol>
+ *     <li>非对称加密和签名：SM2</li>
+ *     <li>摘要签名算法：SM3</li>
+ *     <li>对称加密：SM4</li>
+ * </ol>
  *
  * @author Looly
  * @since 4.6.8
@@ -90,7 +98,7 @@ public class SM4 extends SymmetricCrypto{
 	 * @param iv      偏移向量，加盐
 	 */
 	public SM4(Mode mode, Padding padding, SecretKey key, byte[] iv) {
-		this(mode, padding, key, ArrayUtil.isEmpty(iv) ? ((IvParameterSpec) null) : new IvParameterSpec(iv));
+		this(mode, padding, key, ArrayUtil.isEmpty(iv) ? null : new IvParameterSpec(iv));
 	}
 
 	/**
@@ -137,7 +145,7 @@ public class SM4 extends SymmetricCrypto{
 	public SM4(String mode, String padding, byte[] key, byte[] iv) {
 		this(mode, padding,//
 				SecureUtil.generateKey(ALGORITHM_NAME, key),//
-				ArrayUtil.isEmpty(iv) ? ((IvParameterSpec) null) : new IvParameterSpec(iv));
+				ArrayUtil.isEmpty(iv) ? null : new IvParameterSpec(iv));
 	}
 
 	/**

@@ -34,7 +34,7 @@ public interface Log extends TraceLog, DebugLog, InfoLog, WarnLog, ErrorLog {
 	 * @return Log
 	 * @since 5.0.0
 	 */
-	public static Log get(String name) {
+	static Log get(String name) {
 		return LogFactory.get(name);
 	}
 
@@ -45,7 +45,7 @@ public interface Log extends TraceLog, DebugLog, InfoLog, WarnLog, ErrorLog {
 	static Log get() {
 		return LogFactory.get(CallerUtil.getCallerCaller());
 	}
-	//------------------------------------------------------------------------ Static method start
+	//------------------------------------------------------------------------ Static method end
 
 	/**
 	 * @return 日志对象的Name

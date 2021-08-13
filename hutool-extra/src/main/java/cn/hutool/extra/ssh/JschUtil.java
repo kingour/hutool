@@ -79,9 +79,24 @@ public class JschUtil {
 	 * @return SSH会话
 	 */
 	public static Session openSession(String sshHost, int sshPort, String sshUser, String sshPass) {
+		return openSession(sshHost, sshPort, sshUser, sshPass, 0);
+	}
+
+	/**
+	 * 打开一个新的SSH会话
+	 *
+	 * @param sshHost 主机
+	 * @param sshPort 端口
+	 * @param sshUser 用户名
+	 * @param sshPass 密码
+	 * @param timeout Socket连接超时时长，单位毫秒
+	 * @return SSH会话
+	 * @since 5.3.3
+	 */
+	public static Session openSession(String sshHost, int sshPort, String sshUser, String sshPass, int timeout) {
 		final Session session = createSession(sshHost, sshPort, sshUser, sshPass);
 		try {
-			session.connect();
+			session.connect(timeout);
 		} catch (JSchException e) {
 			throw new JschRuntimeException(e);
 		}
@@ -172,7 +187,7 @@ public class JschUtil {
 			sshUser = "root";
 		}
 
-		if(null == jsch){
+		if (null == jsch) {
 			jsch = new JSch();
 		}
 
@@ -200,16 +215,58 @@ public class JschUtil {
 	 * @throws JschRuntimeException 端口绑定失败异常
 	 */
 	public static boolean bindPort(Session session, String remoteHost, int remotePort, int localPort) throws JschRuntimeException {
+		return bindPort(session, remoteHost, remotePort, "127.0.0.1", localPort);
+	}
+
+	/**
+	 * 绑定端口到本地。 一个会话可绑定多个端口
+	 *
+	 * @param session    需要绑定端口的SSH会话
+	 * @param remoteHost 远程主机
+	 * @param remotePort 远程端口
+	 * @param localHost  本地主机
+	 * @param localPort  本地端口
+	 * @return 成功与否
+	 * @throws JschRuntimeException 端口绑定失败异常
+	 * @since 5.7.8
+	 */
+	public static boolean bindPort(Session session, String remoteHost, int remotePort, String localHost, int localPort) throws JschRuntimeException {
 		if (session != null && session.isConnected()) {
 			try {
-				session.setPortForwardingL(localPort, remoteHost, remotePort);
+				session.setPortForwardingL(localHost, localPort, remoteHost, remotePort);
 			} catch (JSchException e) {
-				throw new JschRuntimeException(e, "From [{}] mapping to [{}] error！", remoteHost, localPort);
+				throw new JschRuntimeException(e, "From [{}:{}] mapping to [{}:{}] error！", remoteHost, remotePort, localHost, localPort);
 			}
 			return true;
 		}
 		return false;
 	}
+
+
+	/**
+	 * 绑定ssh服务端的serverPort端口, 到host主机的port端口上. <br>
+	 * 即数据从ssh服务端的serverPort端口, 流经ssh客户端, 达到host:port上.
+	 *
+	 * @param session  与ssh服务端建立的会话
+	 * @param bindPort ssh服务端上要被绑定的端口
+	 * @param host     转发到的host
+	 * @param port     host上的端口
+	 * @return 成功与否
+	 * @throws JschRuntimeException 端口绑定失败异常
+	 * @since 5.4.2
+	 */
+	public static boolean bindRemotePort(Session session, int bindPort, String host, int port) throws JschRuntimeException {
+		if (session != null && session.isConnected()) {
+			try {
+				session.setPortForwardingR(bindPort, host, port);
+			} catch (JSchException e) {
+				throw new JschRuntimeException(e, "From [{}] mapping to [{}] error！", bindPort, port);
+			}
+			return true;
+		}
+		return false;
+	}
+
 
 	/**
 	 * 解除端口映射
@@ -221,10 +278,10 @@ public class JschUtil {
 	public static boolean unBindPort(Session session, int localPort) {
 		try {
 			session.delPortForwardingL(localPort);
-			return true;
 		} catch (JSchException e) {
 			throw new JschRuntimeException(e);
 		}
+		return true;
 	}
 
 	/**
@@ -238,9 +295,6 @@ public class JschUtil {
 	 */
 	public static int openAndBindPortToLocal(Connector sshConn, String remoteHost, int remotePort) throws JschRuntimeException {
 		final Session session = openSession(sshConn.getHost(), sshConn.getPort(), sshConn.getUser(), sshConn.getPassword());
-		if (session == null) {
-			throw new JschRuntimeException("Error to create SSH Session！");
-		}
 		final int localPort = generateLocalPort();
 		bindPort(session, remoteHost, remotePort, localPort);
 		return localPort;
@@ -254,7 +308,19 @@ public class JschUtil {
 	 * @since 4.0.3
 	 */
 	public static ChannelSftp openSftp(Session session) {
-		return (ChannelSftp) openChannel(session, ChannelType.SFTP);
+		return openSftp(session, 0);
+	}
+
+	/**
+	 * 打开SFTP连接
+	 *
+	 * @param session Session会话
+	 * @param timeout 连接超时时长，单位毫秒
+	 * @return {@link ChannelSftp}
+	 * @since 5.3.3
+	 */
+	public static ChannelSftp openSftp(Session session, int timeout) {
+		return (ChannelSftp) openChannel(session, ChannelType.SFTP, timeout);
 	}
 
 	/**
@@ -302,9 +368,22 @@ public class JschUtil {
 	 * @since 4.5.2
 	 */
 	public static Channel openChannel(Session session, ChannelType channelType) {
+		return openChannel(session, channelType, 0);
+	}
+
+	/**
+	 * 打开Channel连接
+	 *
+	 * @param session     Session会话
+	 * @param channelType 通道类型，可以是shell或sftp等，见{@link ChannelType}
+	 * @param timeout     连接超时时长，单位毫秒
+	 * @return {@link Channel}
+	 * @since 5.3.3
+	 */
+	public static Channel openChannel(Session session, ChannelType channelType, int timeout) {
 		final Channel channel = createChannel(session, channelType);
 		try {
-			channel.connect();
+			channel.connect(Math.max(timeout, 0));
 		} catch (JSchException e) {
 			throw new JschRuntimeException(e);
 		}
@@ -346,28 +425,31 @@ public class JschUtil {
 	}
 
 	/**
-	 * 执行Shell命令
+	 * 执行Shell命令（使用EXEC方式）
+	 * <p>
+	 * 此方法单次发送一个命令到服务端，不读取环境变量，执行结束后自动关闭channel，不会产生阻塞。
+	 * </p>
 	 *
 	 * @param session   Session会话
 	 * @param cmd       命令
 	 * @param charset   发送和读取内容的编码
 	 * @param errStream 错误信息输出到的位置
-	 * @return {@link ChannelExec}
+	 * @return 执行结果内容
 	 * @since 4.3.1
 	 */
 	public static String exec(Session session, String cmd, Charset charset, OutputStream errStream) {
 		if (null == charset) {
 			charset = CharsetUtil.CHARSET_UTF_8;
 		}
-		ChannelExec channel = (ChannelExec) openChannel(session, ChannelType.EXEC);
+		final ChannelExec channel = (ChannelExec) createChannel(session, ChannelType.EXEC);
 		channel.setCommand(StrUtil.bytes(cmd, charset));
 		channel.setInputStream(null);
 		channel.setErrStream(errStream);
 		InputStream in = null;
 		try {
-			channel.start();
+			channel.connect();
 			in = channel.getInputStream();
-			return IoUtil.read(in, CharsetUtil.CHARSET_UTF_8);
+			return IoUtil.read(in, charset);
 		} catch (IOException e) {
 			throw new IORuntimeException(e);
 		} catch (JSchException e) {
@@ -375,6 +457,41 @@ public class JschUtil {
 		} finally {
 			IoUtil.close(in);
 			close(channel);
+		}
+	}
+
+	/**
+	 * 执行Shell命令
+	 * <p>
+	 * 此方法单次发送一个命令到服务端，自动读取环境变量，执行结束后自动关闭channel，不会产生阻塞。
+	 * </p>
+	 *
+	 * @param session Session会话
+	 * @param cmd     命令
+	 * @param charset 发送和读取内容的编码
+	 * @return {@link ChannelExec}
+	 * @since 5.2.5
+	 */
+	public static String execByShell(Session session, String cmd, Charset charset) {
+		final ChannelShell shell = openShell(session);
+		// 开始连接
+		shell.setPty(true);
+		OutputStream out = null;
+		InputStream in = null;
+		try {
+			out = shell.getOutputStream();
+			in = shell.getInputStream();
+
+			out.write(StrUtil.bytes(cmd, charset));
+			out.flush();
+
+			return IoUtil.read(in, charset);
+		} catch (IOException e) {
+			throw new IORuntimeException(e);
+		} finally {
+			IoUtil.close(out);
+			IoUtil.close(in);
+			close(shell);
 		}
 	}
 

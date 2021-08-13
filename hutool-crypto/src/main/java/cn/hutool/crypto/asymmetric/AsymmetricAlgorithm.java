@@ -12,12 +12,12 @@ public enum AsymmetricAlgorithm {
 	RSA("RSA"), 
 	/** RSA算法，此算法用了默认补位方式为RSA/ECB/PKCS1Padding */
 	RSA_ECB_PKCS1("RSA/ECB/PKCS1Padding"), 
+	/** RSA算法，此算法用了默认补位方式为RSA/ECB/NoPadding */
+	RSA_ECB("RSA/ECB/NoPadding"),
 	/** RSA算法，此算法用了RSA/None/NoPadding */
-	RSA_None("RSA/None/NoPadding"), 
-	/** EC（Elliptic Curve）算法 */
-	EC("EC");
+	RSA_None("RSA/None/NoPadding");
 
-	private String value;
+	private final String value;
 
 	/**
 	 * 构造

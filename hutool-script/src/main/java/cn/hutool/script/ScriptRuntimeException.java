@@ -1,9 +1,9 @@
 package cn.hutool.script;
 
-import javax.script.ScriptException;
-
 import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.util.StrUtil;
+
+import javax.script.ScriptException;
 
 /**
  * 脚本运行时异常
@@ -50,7 +50,6 @@ public class ScriptRuntimeException extends RuntimeException {
 		super(message);
 		this.fileName = fileName;
 		this.lineNumber = lineNumber;
-		this.columnNumber = -1;
 	}
 
 	/**
@@ -82,19 +81,19 @@ public class ScriptRuntimeException extends RuntimeException {
 	 */
 	@Override
 	public String getMessage() {
-		String ret = super.getMessage();
+		StringBuilder ret = new StringBuilder().append(super.getMessage());
 		if (fileName != null) {
-			ret += (" in " + fileName);
+			ret.append(" in ").append(fileName);
 			if (lineNumber != -1) {
-				ret += " at line number " + lineNumber;
+				ret.append(" at line number ").append(lineNumber);
 			}
 
 			if (columnNumber != -1) {
-				ret += " at column number " + columnNumber;
+				ret.append(" at column number ").append(columnNumber);
 			}
 		}
 
-		return ret;
+		return ret.toString();
 	}
 
 	/**

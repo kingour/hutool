@@ -12,7 +12,7 @@ import cn.hutool.cache.impl.LRUCache;
  */
 public class LRUFileCache extends AbstractFileCache{
 	private static final long serialVersionUID = 1L;
-	
+
 	/**
 	 * 构造<br>
 	 * 最大文件大小为缓存容量的一半<br>
@@ -45,20 +45,19 @@ public class LRUFileCache extends AbstractFileCache{
 
 	@Override
 	protected Cache<File, byte[]> initCache() {
-		Cache<File, byte[]> cache = new LRUCache<File, byte[]>(this.capacity, super.timeout) {
+		return new LRUCache<File, byte[]>(LRUFileCache.this.capacity, super.timeout) {
 			private static final long serialVersionUID = 1L;
-			
+
 			@Override
 			public boolean isFull() {
 				return LRUFileCache.this.usedSize > this.capacity;
 			}
-			
+
 			@Override
 			protected void onRemove(File key, byte[] cachedObject) {
 				usedSize -= cachedObject.length;
 			}
 		};
-		return cache;
 	}
 
 }

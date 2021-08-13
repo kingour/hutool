@@ -1,5 +1,13 @@
 package cn.hutool.core.util;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DateField;
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.exceptions.UtilException;
+import cn.hutool.core.lang.WeightRandom;
+import cn.hutool.core.lang.WeightRandom.WeightObj;
+
 import java.awt.Color;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -8,20 +16,11 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
-
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DateField;
-import cn.hutool.core.date.DateTime;
-import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.exceptions.UtilException;
-import cn.hutool.core.lang.UUID;
-import cn.hutool.core.lang.WeightRandom;
-import cn.hutool.core.lang.WeightRandom.WeightObj;
 
 /**
  * 随机工具类
@@ -47,6 +46,11 @@ public class RandomUtil {
 	 * 获取随机数生成器对象<br>
 	 * ThreadLocalRandom是JDK 7之后提供并发产生随机数，能够解决多个线程发生的竞争争夺。
 	 *
+	 * <p>
+	 * 注意：此方法返回的{@link ThreadLocalRandom}不可以在多线程环境下共享对象，否则有重复随机数问题。
+	 * 见：https://www.jianshu.com/p/89dfe990295c
+	 * </p>
+	 *
 	 * @return {@link ThreadLocalRandom}
 	 * @since 3.1.2
 	 */
@@ -66,7 +70,7 @@ public class RandomUtil {
 	}
 
 	/**
-	 * 获取{@link SecureRandom}，类提供加密的强随机数生成器 (RNG)<br>
+	 * 获取SHA1PRNG的{@link SecureRandom}，类提供加密的强随机数生成器 (RNG)<br>
 	 * 注意：此方法获取的是伪随机序列发生器PRNG（pseudo-random number generator）
 	 *
 	 * <p>
@@ -76,11 +80,48 @@ public class RandomUtil {
 	 * @since 3.1.2
 	 */
 	public static SecureRandom getSecureRandom() {
+		return getSecureRandom(null);
+	}
+
+	/**
+	 * 获取SHA1PRNG的{@link SecureRandom}，类提供加密的强随机数生成器 (RNG)<br>
+	 * 注意：此方法获取的是伪随机序列发生器PRNG（pseudo-random number generator）
+	 *
+	 * <p>
+	 * 相关说明见：https://stackoverflow.com/questions/137212/how-to-solve-slow-java-securerandom
+	 *
+	 * @param seed 随机数种子
+	 * @return {@link SecureRandom}
+	 * @see #createSecureRandom(byte[])
+	 * @since 5.5.2
+	 */
+	public static SecureRandom getSecureRandom(byte[] seed) {
+		return createSecureRandom(seed);
+	}
+
+	/**
+	 * 获取SHA1PRNG的{@link SecureRandom}，类提供加密的强随机数生成器 (RNG)<br>
+	 * 注意：此方法获取的是伪随机序列发生器PRNG（pseudo-random number generator）,在Linux下噪声生成时可能造成较长时间停顿。<br>
+	 * see: http://ifeve.com/jvm-random-and-entropy-source/
+	 *
+	 * <p>
+	 * 相关说明见：https://stackoverflow.com/questions/137212/how-to-solve-slow-java-securerandom
+	 *
+	 * @param seed 随机数种子
+	 * @return {@link SecureRandom}
+	 * @since 5.5.8
+	 */
+	public static SecureRandom getSHA1PRNGRandom(byte[] seed) {
+		SecureRandom random;
 		try {
-			return SecureRandom.getInstance("SHA1PRNG");
+			random = SecureRandom.getInstance("SHA1PRNG");
 		} catch (NoSuchAlgorithmException e) {
 			throw new UtilException(e);
 		}
+		if (null != seed) {
+			random.setSeed(seed);
+		}
+		return random;
 	}
 
 	/**
@@ -118,9 +159,10 @@ public class RandomUtil {
 	}
 
 	/**
-	 * 获得随机数[0, 2^32)
+	 * 获得随机数int值
 	 *
 	 * @return 随机数
+	 * @see Random#nextInt()
 	 */
 	public static int randomInt() {
 		return getRandom().nextInt();
@@ -131,6 +173,7 @@ public class RandomUtil {
 	 *
 	 * @param limit 限制随机数的范围，不包括这个数
 	 * @return 随机数
+	 * @see Random#nextInt(int)
 	 */
 	public static int randomInt(int limit) {
 		return getRandom().nextInt(limit);
@@ -142,6 +185,7 @@ public class RandomUtil {
 	 * @param min 最小数（包含）
 	 * @param max 最大数（不包含）
 	 * @return 随机数
+	 * @see ThreadLocalRandom#nextLong(long, long)
 	 * @since 3.3.0
 	 */
 	public static long randomLong(long min, long max) {
@@ -152,6 +196,7 @@ public class RandomUtil {
 	 * 获得随机数
 	 *
 	 * @return 随机数
+	 * @see ThreadLocalRandom#nextLong()
 	 * @since 3.3.0
 	 */
 	public static long randomLong() {
@@ -163,6 +208,7 @@ public class RandomUtil {
 	 *
 	 * @param limit 限制随机数的范围，不包括这个数
 	 * @return 随机数
+	 * @see ThreadLocalRandom#nextLong(long)
 	 */
 	public static long randomLong(long limit) {
 		return getRandom().nextLong(limit);
@@ -174,6 +220,7 @@ public class RandomUtil {
 	 * @param min 最小数（包含）
 	 * @param max 最大数（不包含）
 	 * @return 随机数
+	 * @see ThreadLocalRandom#nextDouble(double, double)
 	 * @since 3.3.0
 	 */
 	public static double randomDouble(double min, double max) {
@@ -198,6 +245,7 @@ public class RandomUtil {
 	 * 获得随机数[0, 1)
 	 *
 	 * @return 随机数
+	 * @see ThreadLocalRandom#nextDouble()
 	 * @since 3.3.0
 	 */
 	public static double randomDouble() {
@@ -221,6 +269,7 @@ public class RandomUtil {
 	 *
 	 * @param limit 限制随机数的范围，不包括这个数
 	 * @return 随机数
+	 * @see ThreadLocalRandom#nextDouble(double)
 	 * @since 3.3.0
 	 */
 	public static double randomDouble(double limit) {
@@ -305,6 +354,9 @@ public class RandomUtil {
 	 * @return 随机元素
 	 */
 	public static <T> T randomEle(List<T> list, int limit) {
+		if (list.size() < limit) {
+			limit = list.size();
+		}
 		return list.get(randomInt(limit));
 	}
 
@@ -330,6 +382,9 @@ public class RandomUtil {
 	 * @since 3.3.0
 	 */
 	public static <T> T randomEle(T[] array, int limit) {
+		if (array.length < limit) {
+			limit = array.length;
+		}
 		return array[randomInt(limit)];
 	}
 
@@ -352,6 +407,28 @@ public class RandomUtil {
 	}
 
 	/**
+	 * 随机获得列表中的一定量的元素，返回List<br>
+	 * 此方法与{@link #randomEles(List, int)} 不同点在于，不会获取重复位置的元素
+	 *
+	 * @param source 列表
+	 * @param count  随机取出的个数
+	 * @param <T>    元素类型
+	 * @return 随机列表
+	 * @since 5.2.1
+	 */
+	public static <T> List<T> randomEleList(List<T> source, int count) {
+		if (count >= source.size()) {
+			return source;
+		}
+		final int[] randomList = ArrayUtil.sub(randomInts(source.size()), 0, count);
+		List<T> result = new ArrayList<>();
+		for (int e : randomList) {
+			result.add(source.get(e));
+		}
+		return result;
+	}
+
+	/**
 	 * 随机获得列表中的一定量的不重复元素，返回Set
 	 *
 	 * @param <T>        元素类型
@@ -366,13 +443,29 @@ public class RandomUtil {
 			throw new IllegalArgumentException("Count is larger than collection distinct size !");
 		}
 
-		final HashSet<T> result = new HashSet<>(count);
+		final Set<T> result = new LinkedHashSet<>(count);
 		int limit = source.size();
 		while (result.size() < count) {
 			result.add(randomEle(source, limit));
 		}
 
 		return result;
+	}
+
+	/**
+	 * 创建指定长度的随机索引
+	 *
+	 * @param length 长度
+	 * @return 随机索引
+	 * @since 5.2.1
+	 */
+	public static int[] randomInts(int length) {
+		final int[] range = ArrayUtil.range(length);
+		for (int i = 0; i < length; i++) {
+			int random = randomInt(i, length);
+			ArrayUtil.swap(range, i, random);
+		}
+		return range;
 	}
 
 	/**
@@ -400,7 +493,7 @@ public class RandomUtil {
 	 * 获得一个随机的字符串（只包含数字和字符） 并排除指定字符串
 	 *
 	 * @param length   字符串的长度
-	 * @param elemData 要排除的字符串
+	 * @param elemData 要排除的字符串,如：去重容易混淆的字符串，oO0、lL1、q9Q、pP
 	 * @return 随机字符串
 	 */
 	public static String randomStringWithoutStr(int length, String elemData) {
@@ -449,7 +542,7 @@ public class RandomUtil {
 	 * @return 随机数字字符
 	 * @since 3.1.2
 	 */
-	public static int randomNumber() {
+	public static char randomNumber() {
 		return randomChar(BASE_NUMBER);
 	}
 
@@ -479,10 +572,12 @@ public class RandomUtil {
 	 *
 	 * @return 随机颜色
 	 * @since 4.1.5
+	 * @deprecated 使用ImgUtil.randomColor()
 	 */
+	@Deprecated
 	public static Color randomColor() {
 		final Random random = getRandom();
-		return new Color(random.nextInt(255), random.nextInt(255), random.nextInt(255));
+		return new Color(random.nextInt(256), random.nextInt(256), random.nextInt(256));
 	}
 
 	/**
@@ -507,29 +602,6 @@ public class RandomUtil {
 	 */
 	public static <T> WeightRandom<T> weightRandom(Iterable<WeightObj<T>> weightObjs) {
 		return new WeightRandom<>(weightObjs);
-	}
-
-	// ------------------------------------------------------------------- UUID
-
-	/**
-	 * @return 随机UUID
-	 * @deprecated 请使用{@link IdUtil#randomUUID()}
-	 */
-	@Deprecated
-	public static String randomUUID() {
-		return UUID.randomUUID().toString();
-	}
-
-	/**
-	 * 简化的UUID，去掉了横线
-	 *
-	 * @return 简化的UUID，去掉了横线
-	 * @since 3.2.2
-	 * @deprecated 请使用{@link IdUtil#simpleUUID()}
-	 */
-	@Deprecated
-	public static String simpleUUID() {
-		return UUID.randomUUID().toString(true);
 	}
 
 	/**
@@ -561,4 +633,5 @@ public class RandomUtil {
 
 		return DateUtil.offset(baseDate, dateField, randomInt(min, max));
 	}
+
 }

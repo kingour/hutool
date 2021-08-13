@@ -1,19 +1,26 @@
 package cn.hutool.core.util;
 
-import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.annotation.Alias;
+import cn.hutool.core.bean.NullWrapperBean;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.exceptions.UtilException;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.lang.Filter;
 import cn.hutool.core.lang.SimpleCache;
+import cn.hutool.core.lang.reflect.MethodHandleUtil;
+import cn.hutool.core.map.MapUtil;
 
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -87,7 +94,7 @@ public class ReflectUtil {
 	}
 
 	/**
-	 * 获得一个类中所有字段列表，直接反射获取，无缓存
+	 * 获得一个类中所有构造列表，直接反射获取，无缓存
 	 *
 	 * @param beanClass 类
 	 * @return 字段列表
@@ -114,7 +121,27 @@ public class ReflectUtil {
 	}
 
 	/**
-	 * 查找指定类中的所有字段（包括非public字段），也包括父类和Object类的字段， 字段不存在则返回<code>null</code>
+	 * 获取字段名，如果存在{@link Alias}注解，读取注解的值作为名称
+	 *
+	 * @param field 字段
+	 * @return 字段名
+	 * @since 5.1.6
+	 */
+	public static String getFieldName(Field field) {
+		if (null == field) {
+			return null;
+		}
+
+		final Alias alias = field.getAnnotation(Alias.class);
+		if (null != alias) {
+			return alias.value();
+		}
+
+		return field.getName();
+	}
+
+	/**
+	 * 查找指定类中的指定name的字段（包括非public字段），也包括父类和Object类的字段， 字段不存在则返回{@code null}
 	 *
 	 * @param beanClass 被查找字段的类,不能为null
 	 * @param name      字段名
@@ -123,18 +150,29 @@ public class ReflectUtil {
 	 */
 	public static Field getField(Class<?> beanClass, String name) throws SecurityException {
 		final Field[] fields = getFields(beanClass);
-		if (ArrayUtil.isNotEmpty(fields)) {
-			for (Field field : fields) {
-				if ((name.equals(field.getName()))) {
-					return field;
-				}
-			}
-		}
-		return null;
+		return ArrayUtil.firstMatch((field) -> name.equals(getFieldName(field)), fields);
 	}
 
 	/**
-	 * 获得一个类中所有字段列表，包括其父类中的字段
+	 * 获取指定类中字段名和字段对应的有序Map，包括其父类中的字段<br>
+	 * 如果子类与父类中存在同名字段，则这两个字段同时存在，子类字段在前，父类字段在后。
+	 *
+	 * @param beanClass 类
+	 * @return 字段名和字段对应的Map，有序
+	 * @since 5.0.7
+	 */
+	public static Map<String, Field> getFieldMap(Class<?> beanClass) {
+		final Field[] fields = getFields(beanClass);
+		final HashMap<String, Field> map = MapUtil.newHashMap(fields.length, true);
+		for (Field field : fields) {
+			map.put(field.getName(), field);
+		}
+		return map;
+	}
+
+	/**
+	 * 获得一个类中所有字段列表，包括其父类中的字段<br>
+	 * 如果子类与父类中存在同名字段，则这两个字段同时存在，子类字段在前，父类字段在后。
 	 *
 	 * @param beanClass 类
 	 * @return 字段列表
@@ -151,14 +189,15 @@ public class ReflectUtil {
 	}
 
 	/**
-	 * 获得一个类中所有字段列表，直接反射获取，无缓存
+	 * 获得一个类中所有字段列表，直接反射获取，无缓存<br>
+	 * 如果子类与父类中存在同名字段，则这两个字段同时存在，子类字段在前，父类字段在后。
 	 *
-	 * @param beanClass           类
-	 * @param withSuperClassFieds 是否包括父类的字段列表
+	 * @param beanClass            类
+	 * @param withSuperClassFields 是否包括父类的字段列表
 	 * @return 字段列表
 	 * @throws SecurityException 安全检查异常
 	 */
-	public static Field[] getFieldsDirectly(Class<?> beanClass, boolean withSuperClassFieds) throws SecurityException {
+	public static Field[] getFieldsDirectly(Class<?> beanClass, boolean withSuperClassFields) throws SecurityException {
 		Assert.notNull(beanClass);
 
 		Field[] allFields = null;
@@ -171,7 +210,7 @@ public class ReflectUtil {
 			} else {
 				allFields = ArrayUtil.append(allFields, declaredFields);
 			}
-			searchType = withSuperClassFieds ? searchType.getSuperclass() : null;
+			searchType = withSuperClassFields ? searchType.getSuperclass() : null;
 		}
 
 		return allFields;
@@ -180,7 +219,7 @@ public class ReflectUtil {
 	/**
 	 * 获取字段值
 	 *
-	 * @param obj       对象
+	 * @param obj       对象，如果static字段，此处为类
 	 * @param fieldName 字段名
 	 * @return 字段值
 	 * @throws UtilException 包装IllegalAccessException异常
@@ -189,27 +228,44 @@ public class ReflectUtil {
 		if (null == obj || StrUtil.isBlank(fieldName)) {
 			return null;
 		}
-		return getFieldValue(obj, getField(obj.getClass(), fieldName));
+		return getFieldValue(obj, getField(obj instanceof Class ? (Class<?>) obj : obj.getClass(), fieldName));
+	}
+
+	/**
+	 * 获取静态字段值
+	 *
+	 * @param field 字段
+	 * @return 字段值
+	 * @throws UtilException 包装IllegalAccessException异常
+	 * @since 5.1.0
+	 */
+	public static Object getStaticFieldValue(Field field) throws UtilException {
+		return getFieldValue(null, field);
 	}
 
 	/**
 	 * 获取字段值
 	 *
-	 * @param obj   对象
+	 * @param obj   对象，static字段则此字段为null
 	 * @param field 字段
 	 * @return 字段值
 	 * @throws UtilException 包装IllegalAccessException异常
 	 */
 	public static Object getFieldValue(Object obj, Field field) throws UtilException {
-		if (null == obj || null == field) {
+		if (null == field) {
 			return null;
 		}
+		if (obj instanceof Class) {
+			// 静态字段获取时对象为null
+			obj = null;
+		}
+
 		setAccessible(field);
 		Object result;
 		try {
 			result = field.get(obj);
 		} catch (IllegalAccessException e) {
-			throw new UtilException(e, "IllegalAccess for {}.{}", obj.getClass(), field.getName());
+			throw new UtilException(e, "IllegalAccess for {}.{}", field.getDeclaringClass(), field.getName());
 		}
 		return result;
 	}
@@ -217,13 +273,13 @@ public class ReflectUtil {
 	/**
 	 * 获取所有字段的值
 	 *
-	 * @param obj bean对象
+	 * @param obj bean对象，如果是static字段，此处为类class
 	 * @return 字段值数组
 	 * @since 4.1.17
 	 */
 	public static Object[] getFieldsValue(Object obj) {
 		if (null != obj) {
-			final Field[] fields = getFields(obj.getClass());
+			final Field[] fields = getFields(obj instanceof Class ? (Class<?>) obj : obj.getClass());
 			if (null != fields) {
 				final Object[] values = new Object[fields.length];
 				for (int i = 0; i < fields.length; i++) {
@@ -238,7 +294,7 @@ public class ReflectUtil {
 	/**
 	 * 设置字段值
 	 *
-	 * @param obj       对象
+	 * @param obj       对象,static字段则此处传Class
 	 * @param fieldName 字段名
 	 * @param value     值，值类型必须与字段类型匹配，不会自动转换对象类型
 	 * @throws UtilException 包装IllegalAccessException异常
@@ -247,7 +303,7 @@ public class ReflectUtil {
 		Assert.notNull(obj);
 		Assert.notBlank(fieldName);
 
-		final Field field = getField(obj.getClass(), fieldName);
+		final Field field = getField((obj instanceof Class) ? (Class<?>) obj : obj.getClass(), fieldName);
 		Assert.notNull(field, "Field [{}] is not exist in [{}]", fieldName, obj.getClass().getName());
 		setFieldValue(obj, field, value);
 	}
@@ -255,19 +311,16 @@ public class ReflectUtil {
 	/**
 	 * 设置字段值
 	 *
-	 * @param obj   对象
+	 * @param obj   对象，如果是static字段，此参数为null
 	 * @param field 字段
 	 * @param value 值，值类型必须与字段类型匹配，不会自动转换对象类型
 	 * @throws UtilException UtilException 包装IllegalAccessException异常
 	 */
 	public static void setFieldValue(Object obj, Field field, Object value) throws UtilException {
-		Assert.notNull(obj);
-		Assert.notNull(field, "Field in [{}] not exist !", obj.getClass().getName());
+		Assert.notNull(field, "Field in [{}] not exist !", obj);
 
-		setAccessible(field);
-
+		final Class<?> fieldType = field.getType();
 		if (null != value) {
-			Class<?> fieldType = field.getType();
 			if (false == fieldType.isAssignableFrom(value.getClass())) {
 				//对于类型不同的字段，尝试转换，转换失败则使用原对象类型
 				final Object targetValue = Convert.convert(fieldType, value);
@@ -275,12 +328,16 @@ public class ReflectUtil {
 					value = targetValue;
 				}
 			}
+		} else {
+			// 获取null对应默认值，防止原始类型造成空指针问题
+			value = ClassUtil.getDefaultValue(fieldType);
 		}
 
+		setAccessible(field);
 		try {
-			field.set(obj, value);
+			field.set(obj instanceof Class ? null : obj, value);
 		} catch (IllegalAccessException e) {
-			throw new UtilException(e, "IllegalAccess for {}.{}", obj.getClass(), field.getName());
+			throw new UtilException(e, "IllegalAccess for {}.{}", obj, field.getName());
 		}
 	}
 
@@ -336,7 +393,7 @@ public class ReflectUtil {
 				}
 			}
 		} else {
-			methodList = CollectionUtil.newArrayList(methods);
+			methodList = CollUtil.newArrayList(methods);
 		}
 		return methodList;
 	}
@@ -349,13 +406,8 @@ public class ReflectUtil {
 	 * @return 过滤后的方法列表
 	 */
 	public static List<Method> getPublicMethods(Class<?> clazz, Method... excludeMethods) {
-		final HashSet<Method> excludeMethodSet = CollectionUtil.newHashSet(excludeMethods);
-		return getPublicMethods(clazz, new Filter<Method>() {
-			@Override
-			public boolean accept(Method method) {
-				return false == excludeMethodSet.contains(method);
-			}
-		});
+		final HashSet<Method> excludeMethodSet = CollUtil.newHashSet(excludeMethods);
+		return getPublicMethods(clazz, method -> false == excludeMethodSet.contains(method));
 	}
 
 	/**
@@ -366,17 +418,12 @@ public class ReflectUtil {
 	 * @return 过滤后的方法列表
 	 */
 	public static List<Method> getPublicMethods(Class<?> clazz, String... excludeMethodNames) {
-		final HashSet<String> excludeMethodNameSet = CollectionUtil.newHashSet(excludeMethodNames);
-		return getPublicMethods(clazz, new Filter<Method>() {
-			@Override
-			public boolean accept(Method method) {
-				return false == excludeMethodNameSet.contains(method.getName());
-			}
-		});
+		final HashSet<String> excludeMethodNameSet = CollUtil.newHashSet(excludeMethodNames);
+		return getPublicMethods(clazz, method -> false == excludeMethodNameSet.contains(method.getName()));
 	}
 
 	/**
-	 * 查找指定Public方法 如果找不到对应的方法或方法不为public的则返回<code>null</code>
+	 * 查找指定Public方法 如果找不到对应的方法或方法不为public的则返回{@code null}
 	 *
 	 * @param clazz      类
 	 * @param methodName 方法名
@@ -396,7 +443,7 @@ public class ReflectUtil {
 	 * 查找指定对象中的所有方法（包括非public方法），也包括父对象和Object类的方法
 	 *
 	 * <p>
-	 * 此方法为精准获取方法名，即方法名和参数数量和类型必须一致，否则返回<code>null</code>。
+	 * 此方法为精准获取方法名，即方法名和参数数量和类型必须一致，否则返回{@code null}。
 	 * </p>
 	 *
 	 * @param obj        被查找的对象，如果为{@code null}返回{@code null}
@@ -413,10 +460,10 @@ public class ReflectUtil {
 	}
 
 	/**
-	 * 忽略大小写查找指定方法，如果找不到对应的方法则返回<code>null</code>
+	 * 忽略大小写查找指定方法，如果找不到对应的方法则返回{@code null}
 	 *
 	 * <p>
-	 * 此方法为精准获取方法名，即方法名和参数数量和类型必须一致，否则返回<code>null</code>。
+	 * 此方法为精准获取方法名，即方法名和参数数量和类型必须一致，否则返回{@code null}。
 	 * </p>
 	 *
 	 * @param clazz      类，如果为{@code null}返回{@code null}
@@ -431,10 +478,10 @@ public class ReflectUtil {
 	}
 
 	/**
-	 * 查找指定方法 如果找不到对应的方法则返回<code>null</code>
+	 * 查找指定方法 如果找不到对应的方法则返回{@code null}
 	 *
 	 * <p>
-	 * 此方法为精准获取方法名，即方法名和参数数量和类型必须一致，否则返回<code>null</code>。
+	 * 此方法为精准获取方法名，即方法名和参数数量和类型必须一致，否则返回{@code null}。
 	 * </p>
 	 *
 	 * @param clazz      类，如果为{@code null}返回{@code null}
@@ -448,10 +495,10 @@ public class ReflectUtil {
 	}
 
 	/**
-	 * 查找指定方法 如果找不到对应的方法则返回<code>null</code>
+	 * 查找指定方法 如果找不到对应的方法则返回{@code null}
 	 *
 	 * <p>
-	 * 此方法为精准获取方法名，即方法名和参数数量和类型必须一致，否则返回<code>null</code>。
+	 * 此方法为精准获取方法名，即方法名和参数数量和类型必须一致，否则返回{@code null}。
 	 * </p>
 	 *
 	 * @param clazz      类，如果为{@code null}返回{@code null}
@@ -481,7 +528,7 @@ public class ReflectUtil {
 	}
 
 	/**
-	 * 按照方法名查找指定方法名的方法，只返回匹配到的第一个方法，如果找不到对应的方法则返回<code>null</code>
+	 * 按照方法名查找指定方法名的方法，只返回匹配到的第一个方法，如果找不到对应的方法则返回{@code null}
 	 *
 	 * <p>
 	 * 此方法只检查方法名是否一致，并不检查参数的一致性。
@@ -498,7 +545,7 @@ public class ReflectUtil {
 	}
 
 	/**
-	 * 按照方法名查找指定方法名的方法，只返回匹配到的第一个方法，如果找不到对应的方法则返回<code>null</code>
+	 * 按照方法名查找指定方法名的方法，只返回匹配到的第一个方法，如果找不到对应的方法则返回{@code null}
 	 *
 	 * <p>
 	 * 此方法只检查方法名是否一致（忽略大小写），并不检查参数的一致性。
@@ -515,7 +562,7 @@ public class ReflectUtil {
 	}
 
 	/**
-	 * 按照方法名查找指定方法名的方法，只返回匹配到的第一个方法，如果找不到对应的方法则返回<code>null</code>
+	 * 按照方法名查找指定方法名的方法，只返回匹配到的第一个方法，如果找不到对应的方法则返回{@code null}
 	 *
 	 * <p>
 	 * 此方法只检查方法名是否一致，并不检查参数的一致性。
@@ -627,7 +674,7 @@ public class ReflectUtil {
 	 * @return 是否为equals方法
 	 */
 	public static boolean isEqualsMethod(Method method) {
-		if (method == null || false == method.getName().equals("equals")) {
+		if (method == null || false == "equals".equals(method.getName())) {
 			return false;
 		}
 		final Class<?>[] paramTypes = method.getParameterTypes();
@@ -641,7 +688,9 @@ public class ReflectUtil {
 	 * @return 是否为hashCode方法
 	 */
 	public static boolean isHashCodeMethod(Method method) {
-		return (method != null && method.getName().equals("hashCode") && method.getParameterTypes().length == 0);
+		return method != null//
+				&& "hashCode".equals(method.getName())//
+				&& isEmptyParam(method);
 	}
 
 	/**
@@ -651,7 +700,20 @@ public class ReflectUtil {
 	 * @return 是否为toString方法
 	 */
 	public static boolean isToStringMethod(Method method) {
-		return (method != null && method.getName().equals("toString") && method.getParameterTypes().length == 0);
+		return method != null//
+				&& "toString".equals(method.getName())//
+				&& isEmptyParam(method);
+	}
+
+	/**
+	 * 是否为无参数方法
+	 *
+	 * @param method 方法
+	 * @return 是否为无参数方法
+	 * @since 5.1.1
+	 */
+	public static boolean isEmptyParam(Method method) {
+		return method.getParameterTypes().length == 0;
 	}
 
 	// --------------------------------------------------------------------------------------------------------- newInstance
@@ -706,13 +768,32 @@ public class ReflectUtil {
 
 	/**
 	 * 尝试遍历并调用此类的所有构造方法，直到构造成功并返回
+	 * <p>
+	 * 对于某些特殊的接口，按照其默认实现实例化，例如：
+	 * <pre>
+	 *     Map       -》 HashMap
+	 *     Collction -》 ArrayList
+	 *     List      -》 ArrayList
+	 *     Set       -》 HashSet
+	 * </pre>
 	 *
 	 * @param <T>       对象类型
 	 * @param beanClass 被构造的类
 	 * @return 构造后的对象
 	 */
+	@SuppressWarnings("unchecked")
 	public static <T> T newInstanceIfPossible(Class<T> beanClass) {
 		Assert.notNull(beanClass);
+
+		// 某些特殊接口的实例化按照默认实现进行
+		if (beanClass.isAssignableFrom(AbstractMap.class)) {
+			beanClass = (Class<T>) HashMap.class;
+		} else if (beanClass.isAssignableFrom(List.class)) {
+			beanClass = (Class<T>) ArrayList.class;
+		} else if (beanClass.isAssignableFrom(Set.class)) {
+			beanClass = (Class<T>) HashSet.class;
+		}
+
 		try {
 			return newInstance(beanClass);
 		} catch (Exception e) {
@@ -762,7 +843,7 @@ public class ReflectUtil {
 	 * </pre>
 	 *
 	 * @param <T>    返回对象类型
-	 * @param obj    对象，如果执行静态方法，此值为<code>null</code>
+	 * @param obj    对象，如果执行静态方法，此值为{@code null}
 	 * @param method 方法（对象方法或static方法都可）
 	 * @param args   参数对象
 	 * @return 结果
@@ -770,7 +851,7 @@ public class ReflectUtil {
 	 */
 	public static <T> T invokeWithCheck(Object obj, Method method, Object... args) throws UtilException {
 		final Class<?>[] types = method.getParameterTypes();
-		if (null != types && null != args) {
+		if (null != args) {
 			Assert.isTrue(args.length == types.length, "Params length [{}] is not fit for param length [{}] of method !", args.length, types.length);
 			Class<?> type;
 			for (int i = 0; i < args.length; i++) {
@@ -788,8 +869,17 @@ public class ReflectUtil {
 	/**
 	 * 执行方法
 	 *
+	 * <p>
+	 * 对于用户传入参数会做必要检查，包括：
+	 *
+	 * <pre>
+	 *     1、忽略多余的参数
+	 *     2、参数不够补齐默认值
+	 *     3、传入参数为null，但是目标参数类型为原始类型，做转换
+	 * </pre>
+	 *
 	 * @param <T>    返回对象类型
-	 * @param obj    对象，如果执行静态方法，此值为<code>null</code>
+	 * @param obj    对象，如果执行静态方法，此值为{@code null}
 	 * @param method 方法（对象方法或static方法都可）
 	 * @param args   参数对象
 	 * @return 结果
@@ -799,8 +889,42 @@ public class ReflectUtil {
 	public static <T> T invoke(Object obj, Method method, Object... args) throws UtilException {
 		setAccessible(method);
 
+		// 检查用户传入参数：
+		// 1、忽略多余的参数
+		// 2、参数不够补齐默认值
+		// 3、通过NullWrapperBean传递的参数,会直接赋值null
+		// 4、传入参数为null，但是目标参数类型为原始类型，做转换
+		// 5、传入参数类型不对应，尝试转换类型
+		final Class<?>[] parameterTypes = method.getParameterTypes();
+		final Object[] actualArgs = new Object[parameterTypes.length];
+		if (null != args) {
+			for (int i = 0; i < actualArgs.length; i++) {
+				if (i >= args.length || null == args[i]) {
+					// 越界或者空值
+					actualArgs[i] = ClassUtil.getDefaultValue(parameterTypes[i]);
+				} else if (args[i] instanceof NullWrapperBean) {
+					//如果是通过NullWrapperBean传递的null参数,直接赋值null
+					actualArgs[i] = null;
+				} else if (false == parameterTypes[i].isAssignableFrom(args[i].getClass())) {
+					//对于类型不同的字段，尝试转换，转换失败则使用原对象类型
+					final Object targetValue = Convert.convert(parameterTypes[i], args[i]);
+					if (null != targetValue) {
+						actualArgs[i] = targetValue;
+					}
+				} else {
+					actualArgs[i] = args[i];
+				}
+			}
+		}
+
+		if(method.isDefault()){
+			// 当方法是default方法时，尤其对象是代理对象，需使用句柄方式执行
+			// 代理对象情况下调用method.invoke会导致循环引用执行，最终栈溢出
+			return MethodHandleUtil.invokeSpecial(obj, method, args);
+		}
+
 		try {
-			return (T) method.invoke(ClassUtil.isStatic(method) ? null : obj, args);
+			return (T) method.invoke(ClassUtil.isStatic(method) ? null : obj, actualArgs);
 		} catch (Exception e) {
 			throw new UtilException(e);
 		}
@@ -808,6 +932,7 @@ public class ReflectUtil {
 
 	/**
 	 * 执行对象中指定方法
+	 * 如果需要传递的参数为null,请使用NullWrapperBean来传递,不然会丢失类型信息
 	 *
 	 * @param <T>        返回对象类型
 	 * @param obj        方法所在对象
@@ -815,12 +940,16 @@ public class ReflectUtil {
 	 * @param args       参数列表
 	 * @return 执行结果
 	 * @throws UtilException IllegalAccessException包装
+	 * @see NullWrapperBean
 	 * @since 3.1.2
 	 */
 	public static <T> T invoke(Object obj, String methodName, Object... args) throws UtilException {
+		Assert.notNull(obj, "Object to get method must be not null!");
+		Assert.notBlank(methodName, "Method name must be not blank!");
+
 		final Method method = getMethodOfObj(obj, methodName, args);
 		if (null == method) {
-			throw new UtilException(StrUtil.format("No such method: [{}]", methodName));
+			throw new UtilException("No such method: [{}] from [{}]", methodName, obj.getClass());
 		}
 		return invoke(obj, method, args);
 	}
